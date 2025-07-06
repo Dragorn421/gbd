@@ -190,7 +190,7 @@ class PyRDRAMInterface_ReadAtBased(PyRDRAMInterface):
         return True
 
     def read_at(self, addr: int, size: int) -> bytes:
-        data = self.read_at_impl(self._curpos, size)
+        data = self.read_at_impl(addr, size)
         assert isinstance(data, bytes)
         self._curpos = addr + len(data)
         return data
