@@ -2270,9 +2270,9 @@ chk_SPViewport(gfx_state_t *state)
     state->cur_vp.vp.vtrans[2] = BSWAP16(state->cur_vp.vp.vtrans[2]);
 
     gfxd_printf("        VIEWPORT(\n"
-                "            .vscale.x = qs142(%8.2f), .vtrans.x = qs142(%8.2f)\n"
-                "            .vscale.y = qs142(%8.2f), .vtrans.y = qs142(%8.2f)\n"
-                "            .vscale.z = qs142(%8.2f), .vtrans.z = qs142(%8.2f)\n"
+                "            .vscale.x = qs142(%8.2f), .vtrans.x = qs142(%8.2f),\n"
+                "            .vscale.y = qs142(%8.2f), .vtrans.y = qs142(%8.2f),\n"
+                "            .vscale.z = qs142(%8.2f), .vtrans.z = qs142(%8.2f),\n"
                 "        );\n",
                 state->cur_vp.vp.vscale[0] / 4.0f, state->cur_vp.vp.vtrans[0] / 4.0f, state->cur_vp.vp.vscale[1] / 4.0f,
                 state->cur_vp.vp.vtrans[1] / 4.0f, state->cur_vp.vp.vscale[2] / 4.0f,
