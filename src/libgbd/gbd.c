@@ -4541,7 +4541,7 @@ decode_noop_cmd(gfx_state_t *state)
 
             {
                 DispEntry *disp_ent = (DispEntry *)obstack_peek(&state->disp_stack);
-                if (disp_ent->dl_stack_top != state->dl_stack_top) {
+                if (disp_ent == NULL || disp_ent->dl_stack_top != state->dl_stack_top) {
                     gfxd_printf("\n");
                     WARNING_ERROR(state, GW_UNMATCHED_DISP);
                 } else {
