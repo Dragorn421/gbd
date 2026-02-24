@@ -98,13 +98,18 @@ class PyRDRAMInterface(abc.ABC):
         elem_count: ctypes.c_size_t,
     ):
         try:
-            nbytes = int(elem_size) * int(elem_count)
+            elem_size_int = int(elem_size)
+            elem_count_int = int(elem_count)
+            nbytes = elem_size_int * elem_count_int
             data = self.read(nbytes)
             assert isinstance(data, bytes), type(data)
 
+            if len(data) % elem_size_int != 0:
+                data = data[: len(data) // elem_size_int * elem_size_int]
+
             copy_bytes_to_buf(data, buf)
 
-            return len(data)
+            return len(data) // elem_size_int
         except:
             traceback.print_exc()
             return 0
