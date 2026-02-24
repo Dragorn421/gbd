@@ -1313,7 +1313,7 @@ print_othermode(FILE *print_out, uint32_t othermode_hi, uint32_t othermode_lo)
     print_othermode_lo(print_out, othermode_lo);
 }
 
-#define PRINT_PX(r, g, b) printf(VT_RGBCOL_S("%d;%d;%d", "%d;%d;%d") "\u2584\u2584", r, g, b, r, g, b)
+#define PRINT_PX(r, g, b) gfxd_printf(VT_RGBCOL_S("%d;%d;%d", "%d;%d;%d") "\u2584\u2584", r, g, b, r, g, b)
 
 #define CVT_PX(c, sft, mask) ((((c) >> (sft)) & (mask)) * (255 / (mask)))
 
@@ -1504,20 +1504,20 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
                     goto bad_fmt_siz_err;
             }
         }
-        printf(VT_RST "\n");
+        gfxd_printf(VT_RST "\n");
     }
     return 0;
 
 no_preview:
-    printf(VT_RGBCOL(255, 110, 0, 255, 255, 255) "CI texture could not be previewed" VT_RST "\n");
+    gfxd_printf(VT_RGBCOL(255, 110, 0, 255, 255, 255) "CI texture could not be previewed" VT_RST "\n");
     return 1;
 
 read_err:
-    printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "READ ERROR" VT_RST "\n");
-    printf("%08lX\n", state->rdram->pos());
+    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "draw_last_timg READ ERROR" VT_RST "\n");
+    gfxd_printf("%08lX\n", state->rdram->pos());
     return -1;
 bad_fmt_siz_err:
-    printf(VT_RST);
+    gfxd_printf(VT_RST);
     return -2;
 }
 
@@ -3147,7 +3147,7 @@ chk_DPLoadSync(gfx_state_t *state)
 static int
 chk_DPTileSync(gfx_state_t *state)
 {
-    // tilesync will sync all tile descrptiors, it's hard to knowif a tilesync is superfluous
+    // tilesync will sync all tile descriptors, it's hard to know if a tilesync is superfluous
     // (doesn't help that it's not clear when a tilesync should even be done)
 
     // ARG_CHECK(state, state->tile_busy[], GW_SUPERFLUOUS_TILESYNC);
