@@ -3100,7 +3100,7 @@ chk_DPLoadSync(gfx_state_t *state)
 static int
 chk_DPTileSync(gfx_state_t *state)
 {
-    // tilesync will sync all tile descrptiors, it's hard to knowif a tilesync is superfluous
+    // tilesync will sync all tile descriptors, it's hard to know if a tilesync is superfluous
     // (doesn't help that it's not clear when a tilesync should even be done)
 
     // ARG_CHECK(state, state->tile_busy[], GW_SUPERFLUOUS_TILESYNC);
