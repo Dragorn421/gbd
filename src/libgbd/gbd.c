@@ -2270,9 +2270,9 @@ chk_SPViewport(gfx_state_t *state)
     state->cur_vp.vp.vtrans[2] = BSWAP16(state->cur_vp.vp.vtrans[2]);
 
     gfxd_printf("        VIEWPORT(\n"
-                "            .vscale.x = qs142(%8.2f), .vtrans.x = qs142(%8.2f)\n"
-                "            .vscale.y = qs142(%8.2f), .vtrans.y = qs142(%8.2f)\n"
-                "            .vscale.z = qs142(%8.2f), .vtrans.z = qs142(%8.2f)\n"
+                "            .vscale.x = qs142(%8.2f), .vtrans.x = qs142(%8.2f),\n"
+                "            .vscale.y = qs142(%8.2f), .vtrans.y = qs142(%8.2f),\n"
+                "            .vscale.z = qs142(%8.2f), .vtrans.z = qs142(%8.2f),\n"
                 "        );\n",
                 state->cur_vp.vp.vscale[0] / 4.0f, state->cur_vp.vp.vtrans[0] / 4.0f, state->cur_vp.vp.vscale[1] / 4.0f,
                 state->cur_vp.vp.vtrans[1] / 4.0f, state->cur_vp.vp.vscale[2] / 4.0f,
@@ -3100,7 +3100,7 @@ chk_DPLoadSync(gfx_state_t *state)
 static int
 chk_DPTileSync(gfx_state_t *state)
 {
-    // tilesync will sync all tile descrptiors, it's hard to knowif a tilesync is superfluous
+    // tilesync will sync all tile descriptors, it's hard to know if a tilesync is superfluous
     // (doesn't help that it's not clear when a tilesync should even be done)
 
     // ARG_CHECK(state, state->tile_busy[], GW_SUPERFLUOUS_TILESYNC);
@@ -4146,8 +4146,10 @@ chk_LTB(gfx_state_t *state, uint32_t timg, int fmt, int siz, int width, int heig
 
     if (state->options->print_textures) {
         tile_descriptor_t *tile_desc = get_tile_desc(state, pal);
-        if (tile_desc != NULL)
-            draw_last_timg(state, timg, fmt, siz, height, width, tile_desc->tmem, pal, tile_desc->lrs);
+        if (tile_desc != NULL) {
+            uint32_t timg_phys = segmented_to_physical(state, timg);
+            draw_last_timg(state, timg_phys, fmt, siz, height, width, tile_desc->tmem, pal, tile_desc->lrs);
+        }
     }
 
     return 0;
@@ -4487,7 +4489,7 @@ decode_noop_cmd(gfx_state_t *state)
         case 1:
             gfxd_printf("gsDPNoOpHere(" STRING_COLOR);
             print_string(state, segmented_to_physical(state, noop_data->u), gfx_fprintf_wrapper, NULL);
-            gfxd_printf(VT_RST ", 0x%04X)", noop_data->u, noop_data1->u);
+            gfxd_printf(VT_RST ", %" PRIu32 ")", noop_data1->u);
             break;
 
         case 2:
@@ -4541,16 +4543,19 @@ decode_noop_cmd(gfx_state_t *state)
 
             {
                 DispEntry *disp_ent = (DispEntry *)obstack_peek(&state->disp_stack);
-                if (disp_ent->dl_stack_top != state->dl_stack_top)
+                if (disp_ent == NULL || disp_ent->dl_stack_top != state->dl_stack_top) {
+                    gfxd_printf("\n");
                     WARNING_ERROR(state, GW_UNMATCHED_DISP);
-                else
+                } else {
                     obstack_pop(&state->disp_stack, 1);
+                }
             }
             break;
 
         default:
         emit_noop_tag3:
             gfxd_printf("%s(0x%02X, 0x%08X, 0x%04X)", gfxd_macro_name(), noop_type->u, noop_data->u, noop_data1->u);
+            gfxd_printf("\n");
             WARNING_ERROR(state, GW_UNK_NOOP_TAG3);
             break;
     }
