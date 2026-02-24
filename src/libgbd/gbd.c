@@ -4541,16 +4541,19 @@ decode_noop_cmd(gfx_state_t *state)
 
             {
                 DispEntry *disp_ent = (DispEntry *)obstack_peek(&state->disp_stack);
-                if (disp_ent->dl_stack_top != state->dl_stack_top)
+                if (disp_ent->dl_stack_top != state->dl_stack_top) {
+                    gfxd_printf("\n");
                     WARNING_ERROR(state, GW_UNMATCHED_DISP);
-                else
+                } else {
                     obstack_pop(&state->disp_stack, 1);
+                }
             }
             break;
 
         default:
         emit_noop_tag3:
             gfxd_printf("%s(0x%02X, 0x%08X, 0x%04X)", gfxd_macro_name(), noop_type->u, noop_data->u, noop_data1->u);
+            gfxd_printf("\n");
             WARNING_ERROR(state, GW_UNK_NOOP_TAG3);
             break;
     }
