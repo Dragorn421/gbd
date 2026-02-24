@@ -141,6 +141,11 @@ typedef struct {
 #define VTX_CACHE_SIZE 32
 
 typedef struct {
+    int      n_gfx; // Position in state.n_gfx units
+    uint32_t addr_phys;
+} last_load_tlut_t;
+
+typedef struct {
     // Options
     gbd_options_t        *options;
     gfx_ucode_registry_t *ucodes;
@@ -229,8 +234,16 @@ typedef struct {
         uint32_t width;
         uint32_t addr;
     } last_timg;
-    uint32_t fill_color;
-    bool     fill_color_set;
+    uint32_t         fill_color;
+    bool             fill_color_set;
+    int              last_draw_n_gfx;
+    last_load_tlut_t last_load_tlut_pal16[16];
+    last_load_tlut_t last_load_tlut_pal256;
+    struct {
+        int      n_gfx;
+        uint32_t addr_phys;
+        int      fmt, siz, width, height, pal;
+    } last_ltb;
 
     // RDRAM
     rdram_interface_t *rdram;
@@ -1305,10 +1318,10 @@ print_othermode(FILE *print_out, uint32_t othermode_hi, uint32_t othermode_lo)
 #define CVT_PX(c, sft, mask) ((((c) >> (sft)) & (mask)) * (255 / (mask)))
 
 int
-draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, int width, uint32_t tlut, int tlut_type,
-               int tlut_count)
+draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, int width, int pal)
 {
-    int fmt_siz = FMT_SIZ(fmt, siz);
+    int      fmt_siz   = FMT_SIZ(fmt, siz);
+    uint32_t tlut_type = state->othermode_hi & MDMASK(TEXTLUT);
 
     state->rdram->seek(timg);
 
@@ -1346,13 +1359,15 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
                     {
                         // TODO previewing of CI4/CI8 textures is unreliable as the TLUT may be loaded after the index
                         // data
-                        if (tlut == 0 || tlut_type == G_TT_NONE)
+                        if (tlut_type == G_TT_NONE || state->last_load_tlut_pal16[pal].n_gfx <= state->last_draw_n_gfx)
                             goto no_preview;
 
                         uint8_t ci8_i_x2;
 
                         if (state->rdram->read(&ci8_i_x2, sizeof(uint8_t), 1) != 1)
                             goto read_err;
+
+                        uint32_t tlut = state->last_load_tlut_pal16[pal].addr_phys;
 
                         uint16_t tlut_pxs[2];
 
@@ -1378,6 +1393,8 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
                                     break;
                             }
                         }
+
+                        j++;
                     }
                     break;
 
@@ -1405,8 +1422,9 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_CI, G_IM_SIZ_8b):
                     {
-                        if (tlut == 0 || tlut_type == G_TT_NONE)
+                        if (tlut_type == G_TT_NONE || state->last_load_tlut_pal256.n_gfx <= state->last_draw_n_gfx) {
                             goto no_preview;
+                        }
 
                         uint8_t ci8_i;
 
@@ -1415,6 +1433,8 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                         // if (ci8_i > tlut_count)
                         //     goto read_err;
+
+                        uint32_t tlut = state->last_load_tlut_pal256.addr_phys;
 
                         uint16_t tlut_px;
 
@@ -2539,6 +2559,8 @@ chk_render_primitive(gfx_state_t *state, enum prim_type prim_type, int tile)
 static int
 chk_DPFillTriangle(gfx_state_t *state, int tnum, int v0, int v1, int v2, int flag)
 {
+    state->last_draw_n_gfx = state->n_gfx;
+
     int last_loaded_vtx_num = state->last_loaded_vtx_num;
 
     bool all_in_bounds =
@@ -3026,6 +3048,25 @@ chk_DPLoadTile(gfx_state_t *state)
 }
 
 static int
+chk_DPLoadTLUT_pal16(gfx_state_t *state)
+{
+    uint32_t pal  = gfxd_arg_value(0)->u;
+    uint32_t dram = gfxd_arg_value(1)->u;
+    state->last_load_tlut_pal16[pal].n_gfx     = state->n_gfx;
+    state->last_load_tlut_pal16[pal].addr_phys = segmented_to_physical(state, dram);
+    return 0;
+}
+
+static int
+chk_DPLoadTLUT_pal256(gfx_state_t *state)
+{
+    uint32_t dram = gfxd_arg_value(0)->u;
+    state->last_load_tlut_pal256.n_gfx     = state->n_gfx;
+    state->last_load_tlut_pal256.addr_phys = segmented_to_physical(state, dram);
+    return 0;
+}
+
+static int
 chk_DPLoadTLUTCmd(gfx_state_t *state)
 {
     uint32_t *ltlut_data = (uint32_t *)gfxd_macro_data();
@@ -3078,6 +3119,12 @@ chk_DPLoadTLUTCmd(gfx_state_t *state)
         tile_desc->lrs = lrs;
         tile_desc->lrt = lrt;
     }
+
+    if (state->last_ltb.n_gfx >= state->last_draw_n_gfx) {
+        draw_last_timg(state, state->last_ltb.addr_phys, state->last_ltb.fmt, state->last_ltb.siz,
+                       state->last_ltb.height, state->last_ltb.width, state->last_ltb.pal);
+    }
+
     return 0;
 }
 
@@ -4145,11 +4192,8 @@ chk_LTB(gfx_state_t *state, uint32_t timg, int fmt, int siz, int width, int heig
     //           "a width of %d may only have at most %d texture lines, this has %d", width, mlines, height);
 
     if (state->options->print_textures) {
-        tile_descriptor_t *tile_desc = get_tile_desc(state, pal);
-        if (tile_desc != NULL) {
-            uint32_t timg_phys = segmented_to_physical(state, timg);
-            draw_last_timg(state, timg_phys, fmt, siz, height, width, tile_desc->tmem, pal, tile_desc->lrs);
-        }
+        uint32_t timg_phys = segmented_to_physical(state, timg);
+        draw_last_timg(state, timg_phys, fmt, siz, height, width, pal);
     }
 
     return 0;
@@ -4170,6 +4214,14 @@ chk_DPLoadTextureBlock(gfx_state_t *state)
     int      maskt  = gfxd_arg_value(9)->i;
     int      shifts = gfxd_arg_value(10)->i;
     int      shiftt = gfxd_arg_value(11)->i;
+
+    state->last_ltb.n_gfx     = state->n_gfx;
+    state->last_ltb.addr_phys = segmented_to_physical(state, timg);
+    state->last_ltb.fmt       = fmt;
+    state->last_ltb.siz       = siz;
+    state->last_ltb.width     = width;
+    state->last_ltb.height    = height;
+    state->last_ltb.pal       = pal;
 
     return chk_LTB(state, timg, fmt, siz, width, height, pal, cms, cmt, masks, maskt, shifts, shiftt);
 }
@@ -4211,8 +4263,8 @@ static chk_fn chk_tbl[] = {
     [gfxd_DPLoadSync]              = chk_DPLoadSync,
     [gfxd_DPTileSync]              = chk_DPTileSync,
     [gfxd_DPPipeSync]              = chk_DPPipeSync,
-    [gfxd_DPLoadTLUT_pal16]        = NULL,
-    [gfxd_DPLoadTLUT_pal256]       = NULL,
+    [gfxd_DPLoadTLUT_pal16]        = chk_DPLoadTLUT_pal16,
+    [gfxd_DPLoadTLUT_pal256]       = chk_DPLoadTLUT_pal256,
     [gfxd_DPLoadMultiBlockYuvS]    = NULL,
     [gfxd_DPLoadMultiBlockYuv]     = NULL,
     [gfxd_DPLoadMultiBlock_4bS]    = NULL,
@@ -4734,7 +4786,14 @@ analyze_gbi(FILE *print_out, gfx_ucode_registry_t *ucodes, gbd_options_t *opts, 
         .load_busy           = false,
         .fill_color          = 0,
         .fill_color_set      = false,
+
+        .last_draw_n_gfx       = -1,
+        .last_load_tlut_pal256 = { .n_gfx = -1 },
+        .last_ltb              = { .n_gfx = -1 },
     };
+
+    for (int i = 0; i < 16; i++)
+        state.last_load_tlut_pal16[i].n_gfx = -1;
 
     state.ucodes  = ucodes;
     state.rdram   = rdram;
