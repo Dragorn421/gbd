@@ -4926,3 +4926,10 @@ err:
     state.rdram->close();
     return -1;
 }
+
+// For Python bindings to use
+FILE *
+fdopen_wrapper(int fd, const char *modes)
+{
+    return fdopen(fd, modes);
+}

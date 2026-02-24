@@ -316,15 +316,15 @@ gfxbd.analyze_gbi.argtypes = [
 gfxbd.analyze_gbi.restype = ctypes.c_int
 
 
-def fdopen(fd: int):
-    if SYSTEM == "Linux":
-        libc = ctypes.CDLL("libc.so.6")
-        libc.fdopen.argtypes = [ctypes.c_int, ctypes.c_char_p]
-        libc.fdopen.restype = ctypes.c_void_p  # FILE *
-        _fdopen = libc.fdopen
-        return _fdopen(fd, b"w")
-    elif SYSTEM == "Windows":
-        raise NotImplementedError(SYSTEM)
+gfxbd.fdopen_wrapper.argtypes = [
+    ctypes.c_int,  # fd
+    ctypes.c_char_p,  # modes
+]
+gfxbd.fdopen_wrapper.restype = ctypes.c_void_p  # FILE*
+
+
+def fdopen(fd: int, modes: bytes):
+    return gfxbd.fdopen_wrapper(fd, modes)
 
 
 def analyze_gbi(
@@ -335,7 +335,7 @@ def analyze_gbi(
     start_location: struct_start_location_info,
 ):
     r = gfxbd.analyze_gbi(
-        fdopen(print_out_fileno),
+        fdopen(print_out_fileno, b"w"),
         (gfx_ucode_registry_t * (len(ucodes) + 1))(
             *ucodes,
             gfx_ucode_registry_t(),
