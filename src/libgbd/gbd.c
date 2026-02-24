@@ -3050,8 +3050,8 @@ chk_DPLoadTile(gfx_state_t *state)
 static int
 chk_DPLoadTLUT_pal16(gfx_state_t *state)
 {
-    uint32_t pal  = gfxd_arg_value(0)->u;
-    uint32_t dram = gfxd_arg_value(1)->u;
+    uint32_t pal                               = gfxd_arg_value(0)->u;
+    uint32_t dram                              = gfxd_arg_value(1)->u;
     state->last_load_tlut_pal16[pal].n_gfx     = state->n_gfx;
     state->last_load_tlut_pal16[pal].addr_phys = segmented_to_physical(state, dram);
     return 0;
@@ -3060,7 +3060,7 @@ chk_DPLoadTLUT_pal16(gfx_state_t *state)
 static int
 chk_DPLoadTLUT_pal256(gfx_state_t *state)
 {
-    uint32_t dram = gfxd_arg_value(0)->u;
+    uint32_t dram                          = gfxd_arg_value(0)->u;
     state->last_load_tlut_pal256.n_gfx     = state->n_gfx;
     state->last_load_tlut_pal256.addr_phys = segmented_to_physical(state, dram);
     return 0;
