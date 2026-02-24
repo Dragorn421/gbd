@@ -1323,7 +1323,27 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
     int      fmt_siz   = FMT_SIZ(fmt, siz);
     uint32_t tlut_type = state->othermode_hi & MDMASK(TEXTLUT);
 
-    state->rdram->seek(timg);
+    int bits_per_pixel[] = {
+        [G_IM_SIZ_4b]  = 4,
+        [G_IM_SIZ_8b]  = 8,
+        [G_IM_SIZ_16b] = 16,
+        [G_IM_SIZ_32b] = 32,
+    };
+    size_t   tex_size = width * height * bits_per_pixel[siz] / 8;
+    uint8_t  tex[tex_size];
+    uint16_t tlut[256];
+
+    state->rdram->read_at(tex, timg, tex_size);
+
+    if (fmt == G_IM_FMT_CI) {
+        if (siz == G_IM_SIZ_4b) {
+            state->rdram->read_at(tlut, state->last_load_tlut_pal16[pal].addr_phys, 16 * 2);
+        } else if (siz == G_IM_SIZ_8b) {
+            state->rdram->read_at(tlut, state->last_load_tlut_pal256.addr_phys, 256 * 2);
+        }
+        for (int i = 0; i < (siz == G_IM_SIZ_4b ? 16 : 256); i++)
+            tlut[i] = BSWAP16(tlut[i]);
+    }
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -1331,10 +1351,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
             switch (fmt_siz) {
                 case FMT_SIZ(G_IM_FMT_I, G_IM_SIZ_4b):
                     {
-                        uint8_t i4_px_x2;
-
-                        if (state->rdram->read(&i4_px_x2, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
+                        uint8_t i4_px_x2 = tex[(i * width + j) / 2];
 
                         PRINT_PX(CVT_PX(i4_px_x2, 4, 15), CVT_PX(i4_px_x2, 4, 15), CVT_PX(i4_px_x2, 4, 15));
                         j++; // TODO what happens if these 4-bit textures have an odd width?
@@ -1344,10 +1361,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_IA, G_IM_SIZ_4b):
                     {
-                        uint8_t ia4_px_x2;
-
-                        if (state->rdram->read(&ia4_px_x2, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
+                        uint8_t ia4_px_x2 = tex[(i * width + j) / 2];
 
                         PRINT_PX(CVT_PX(ia4_px_x2, 5, 7), CVT_PX(ia4_px_x2, 5, 7), CVT_PX(ia4_px_x2, 5, 7));
                         j++;
@@ -1357,31 +1371,22 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_CI, G_IM_SIZ_4b):
                     {
-                        // TODO previewing of CI4/CI8 textures is unreliable as the TLUT may be loaded after the index
-                        // data
-                        if (tlut_type == G_TT_NONE || state->last_load_tlut_pal16[pal].n_gfx <= state->last_draw_n_gfx)
+                        if (tlut_type == G_TT_NONE ||
+                            state->last_load_tlut_pal16[pal].n_gfx <= state->last_draw_n_gfx) {
+                            gfxd_printf("ci4 no_preview 0x%X %d %d\n", tlut_type,
+                                        state->last_load_tlut_pal16[pal].n_gfx, state->last_draw_n_gfx);
                             goto no_preview;
+                        }
 
-                        uint8_t ci8_i_x2;
-
-                        if (state->rdram->read(&ci8_i_x2, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
-
-                        uint32_t tlut = state->last_load_tlut_pal16[pal].addr_phys;
+                        uint8_t ci8_i_x2 = tex[(i * width + j) / 2];
 
                         uint16_t tlut_pxs[2];
 
-                        uint32_t save_pos = state->rdram->pos();
-                        state->rdram->seek(tlut + sizeof(uint16_t) * (ci8_i_x2 >> 4));
-                        if (state->rdram->read(&tlut_pxs[0], sizeof(uint16_t), 1) != 1)
-                            goto read_err;
-                        state->rdram->seek(tlut + sizeof(uint16_t) * (ci8_i_x2 & 0xF));
-                        if (state->rdram->read(&tlut_pxs[1], sizeof(uint16_t), 1) != 1)
-                            goto read_err;
-                        state->rdram->seek(save_pos);
+                        tlut_pxs[0] = tlut[ci8_i_x2 >> 4];
+                        tlut_pxs[1] = tlut[ci8_i_x2 & 0xF];
 
                         for (int k = 0; k < 2; k++) {
-                            uint16_t tlut_px = BSWAP16(tlut_pxs[k]);
+                            uint16_t tlut_px = tlut_pxs[k];
 
                             switch (tlut_type) {
                                 case G_TT_RGBA16:
@@ -1400,10 +1405,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_I, G_IM_SIZ_8b):
                     {
-                        uint8_t i8_px;
-
-                        if (state->rdram->read(&i8_px, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
+                        uint8_t i8_px = tex[i * width + j];
 
                         PRINT_PX(CVT_PX(i8_px, 0, 255), CVT_PX(i8_px, 0, 255), CVT_PX(i8_px, 0, 255));
                     }
@@ -1411,10 +1413,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_IA, G_IM_SIZ_8b):
                     {
-                        uint8_t ia8_px;
-
-                        if (state->rdram->read(&ia8_px, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
+                        uint8_t ia8_px = tex[i * width + j];
 
                         PRINT_PX(CVT_PX(ia8_px, 4, 15), CVT_PX(ia8_px, 4, 15), CVT_PX(ia8_px, 4, 15));
                     }
@@ -1426,25 +1425,9 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
                             goto no_preview;
                         }
 
-                        uint8_t ci8_i;
+                        uint8_t ci8_i = tex[i * width + j];
 
-                        if (state->rdram->read(&ci8_i, sizeof(uint8_t), 1) != 1)
-                            goto read_err;
-
-                        // if (ci8_i > tlut_count)
-                        //     goto read_err;
-
-                        uint32_t tlut = state->last_load_tlut_pal256.addr_phys;
-
-                        uint16_t tlut_px;
-
-                        uint32_t save_pos = state->rdram->pos();
-                        state->rdram->seek(tlut + sizeof(uint16_t) * ci8_i);
-                        if (state->rdram->read(&tlut_px, sizeof(uint16_t), 1) != 1)
-                            goto read_err;
-                        state->rdram->seek(save_pos);
-
-                        tlut_px = BSWAP16(tlut_px);
+                        uint16_t tlut_px = tlut[ci8_i];
 
                         switch (tlut_type) {
                             case G_TT_RGBA16:
@@ -1460,12 +1443,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_IA, G_IM_SIZ_16b):
                     {
-                        uint16_t ia16_px;
-
-                        if (state->rdram->read(&ia16_px, sizeof(uint16_t), 1) != 1)
-                            goto read_err;
-
-                        ia16_px = BSWAP16(ia16_px);
+                        uint16_t ia16_px = (tex[(i * width + j) * 2] << 8) | tex[(i * width + j) * 2 + 1];
 
                         // TODO most of these require the alpha channel to be visible to properly see what these look
                         // like
@@ -1475,12 +1453,7 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_RGBA, G_IM_SIZ_16b):
                     {
-                        uint16_t rgba16_px;
-
-                        if (state->rdram->read(&rgba16_px, sizeof(uint16_t), 1) != 1)
-                            goto read_err;
-
-                        rgba16_px = BSWAP16(rgba16_px);
+                        uint16_t rgba16_px = (tex[(i * width + j) * 2] << 8) | tex[(i * width + j) * 2 + 1];
 
                         PRINT_PX(CVT_PX(rgba16_px, 11, 31), CVT_PX(rgba16_px, 6, 31), CVT_PX(rgba16_px, 1, 31));
                     }
@@ -1488,12 +1461,8 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
 
                 case FMT_SIZ(G_IM_FMT_RGBA, G_IM_SIZ_32b):
                     {
-                        uint32_t rgba32_px;
-
-                        if (state->rdram->read(&rgba32_px, sizeof(uint32_t), 1) != 1)
-                            goto read_err;
-
-                        rgba32_px = BSWAP32(rgba32_px);
+                        uint32_t rgba32_px = (tex[(i * width + j) * 4] << 24) | (tex[(i * width + j) * 4 + 1] << 16) |
+                                             (tex[(i * width + j) * 4 + 2] << 8) | tex[(i * width + j) * 4 + 3];
 
                         PRINT_PX(CVT_PX(rgba32_px, 24, 255), CVT_PX(rgba32_px, 16, 255), CVT_PX(rgba32_px, 8, 255));
                     }
