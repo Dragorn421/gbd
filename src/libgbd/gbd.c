@@ -4146,8 +4146,10 @@ chk_LTB(gfx_state_t *state, uint32_t timg, int fmt, int siz, int width, int heig
 
     if (state->options->print_textures) {
         tile_descriptor_t *tile_desc = get_tile_desc(state, pal);
-        if (tile_desc != NULL)
-            draw_last_timg(state, timg, fmt, siz, height, width, tile_desc->tmem, pal, tile_desc->lrs);
+        if (tile_desc != NULL) {
+            uint32_t timg_phys = segmented_to_physical(state, timg);
+            draw_last_timg(state, timg_phys, fmt, siz, height, width, tile_desc->tmem, pal, tile_desc->lrs);
+        }
     }
 
     return 0;
