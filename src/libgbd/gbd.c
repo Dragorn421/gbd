@@ -1513,7 +1513,7 @@ no_preview:
     return 1;
 
 read_err:
-    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "draw_last_timg READ ERROR" VT_RST "\n");
+    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "READ ERROR" VT_RST "\n");
     gfxd_printf("%08lX\n", state->rdram->pos());
     return -1;
 bad_fmt_siz_err:
