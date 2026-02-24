@@ -24,6 +24,7 @@ usage(char *exec_name)
            "[--print-vertices] "
            "[--print-matrices] "
            "[--print-lights] "
+           "[--print-multi-packet] "
            "[--to-num <n>] "
            "[--encoding <encoding>] "
            "[--quiet] "

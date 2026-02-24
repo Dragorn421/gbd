@@ -1313,7 +1313,7 @@ print_othermode(FILE *print_out, uint32_t othermode_hi, uint32_t othermode_lo)
     print_othermode_lo(print_out, othermode_lo);
 }
 
-#define PRINT_PX(r, g, b) printf(VT_RGBCOL_S("%d;%d;%d", "%d;%d;%d") "\u2584\u2584", r, g, b, r, g, b)
+#define PRINT_PX(r, g, b) gfxd_printf(VT_RGBCOL_S("%d;%d;%d", "%d;%d;%d") "\u2584\u2584", r, g, b, r, g, b)
 
 #define CVT_PX(c, sft, mask) ((((c) >> (sft)) & (mask)) * (255 / (mask)))
 
@@ -1504,20 +1504,20 @@ draw_last_timg(gfx_state_t *state, uint32_t timg, int fmt, int siz, int height, 
                     goto bad_fmt_siz_err;
             }
         }
-        printf(VT_RST "\n");
+        gfxd_printf(VT_RST "\n");
     }
     return 0;
 
 no_preview:
-    printf(VT_RGBCOL(255, 110, 0, 255, 255, 255) "CI texture could not be previewed" VT_RST "\n");
+    gfxd_printf(VT_RGBCOL(255, 110, 0, 255, 255, 255) "CI texture could not be previewed" VT_RST "\n");
     return 1;
 
 read_err:
-    printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "READ ERROR" VT_RST "\n");
-    printf("%08lX\n", state->rdram->pos());
+    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "draw_last_timg READ ERROR" VT_RST "\n");
+    gfxd_printf("%08lX\n", state->rdram->pos());
     return -1;
 bad_fmt_siz_err:
-    printf(VT_RST);
+    gfxd_printf(VT_RST);
     return -2;
 }
 
@@ -3050,8 +3050,8 @@ chk_DPLoadTile(gfx_state_t *state)
 static int
 chk_DPLoadTLUT_pal16(gfx_state_t *state)
 {
-    uint32_t pal  = gfxd_arg_value(0)->u;
-    uint32_t dram = gfxd_arg_value(1)->u;
+    uint32_t pal                               = gfxd_arg_value(0)->u;
+    uint32_t dram                              = gfxd_arg_value(1)->u;
     state->last_load_tlut_pal16[pal].n_gfx     = state->n_gfx;
     state->last_load_tlut_pal16[pal].addr_phys = segmented_to_physical(state, dram);
     return 0;
@@ -3060,7 +3060,7 @@ chk_DPLoadTLUT_pal16(gfx_state_t *state)
 static int
 chk_DPLoadTLUT_pal256(gfx_state_t *state)
 {
-    uint32_t dram = gfxd_arg_value(0)->u;
+    uint32_t dram                          = gfxd_arg_value(0)->u;
     state->last_load_tlut_pal256.n_gfx     = state->n_gfx;
     state->last_load_tlut_pal256.addr_phys = segmented_to_physical(state, dram);
     return 0;
@@ -4173,6 +4173,14 @@ chk_LTB(gfx_state_t *state, uint32_t timg, int fmt, int siz, int width, int heig
 {
     // ARG_CHECK(state, ltb_dims_valid(width, height, siz), "Bad width-height combination for LoadTextureBlock");
 
+    state->last_ltb.n_gfx     = state->n_gfx;
+    state->last_ltb.addr_phys = segmented_to_physical(state, timg);
+    state->last_ltb.fmt       = fmt;
+    state->last_ltb.siz       = siz;
+    state->last_ltb.width     = width;
+    state->last_ltb.height    = height;
+    state->last_ltb.pal       = pal;
+
     int mlines = max_lines(width, siz);
 
     // For LTB, not all width-height combinations are valid for loading. Check that the load is not corrupted.
@@ -4214,14 +4222,6 @@ chk_DPLoadTextureBlock(gfx_state_t *state)
     int      maskt  = gfxd_arg_value(9)->i;
     int      shifts = gfxd_arg_value(10)->i;
     int      shiftt = gfxd_arg_value(11)->i;
-
-    state->last_ltb.n_gfx     = state->n_gfx;
-    state->last_ltb.addr_phys = segmented_to_physical(state, timg);
-    state->last_ltb.fmt       = fmt;
-    state->last_ltb.siz       = siz;
-    state->last_ltb.width     = width;
-    state->last_ltb.height    = height;
-    state->last_ltb.pal       = pal;
 
     return chk_LTB(state, timg, fmt, siz, width, height, pal, cms, cmt, masks, maskt, shifts, shiftt);
 }
