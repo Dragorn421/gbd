@@ -1513,7 +1513,7 @@ no_preview:
     return 1;
 
 read_err:
-    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "draw_last_timg READ ERROR" VT_RST "\n");
+    gfxd_printf(VT_RGBCOL(255, 0, 0, 255, 255, 255) "READ ERROR" VT_RST "\n");
     gfxd_printf("%08lX\n", state->rdram->pos());
     return -1;
 bad_fmt_siz_err:
@@ -3120,7 +3120,7 @@ chk_DPLoadTLUTCmd(gfx_state_t *state)
         tile_desc->lrt = lrt;
     }
 
-    if (state->last_ltb.n_gfx >= state->last_draw_n_gfx) {
+    if (state->options->print_textures && state->last_ltb.n_gfx >= state->last_draw_n_gfx) {
         draw_last_timg(state, state->last_ltb.addr_phys, state->last_ltb.fmt, state->last_ltb.siz,
                        state->last_ltb.height, state->last_ltb.width, state->last_ltb.pal);
     }
