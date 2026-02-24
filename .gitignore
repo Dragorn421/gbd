@@ -9,3 +9,5 @@ tests/**
 
 # libiconv
 libiconv/**
+
+__pycache__
