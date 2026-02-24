@@ -4487,7 +4487,7 @@ decode_noop_cmd(gfx_state_t *state)
         case 1:
             gfxd_printf("gsDPNoOpHere(" STRING_COLOR);
             print_string(state, segmented_to_physical(state, noop_data->u), gfx_fprintf_wrapper, NULL);
-            gfxd_printf(VT_RST ", 0x%04X)", noop_data->u, noop_data1->u);
+            gfxd_printf(VT_RST ", %" PRIu32 ")", noop_data1->u);
             break;
 
         case 2:
