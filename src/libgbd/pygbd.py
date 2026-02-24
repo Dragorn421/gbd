@@ -355,7 +355,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("ram_dump", type=Path)
-    parser.add_argument("start_addr", type=int)
+    parser.add_argument("start_addr", type=lambda v: int(v, 0))
     args = parser.parse_args()
 
     ram_dump_p: Path = args.ram_dump
