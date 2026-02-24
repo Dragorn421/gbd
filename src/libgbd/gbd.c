@@ -3017,6 +3017,29 @@ chk_DPLoadTile(gfx_state_t *state)
 }
 
 static int
+chk_DPLoadTLUT(gfx_state_t *state)
+{
+    int32_t  count    = gfxd_arg_value(0)->i;
+    uint32_t tmem     = gfxd_arg_value(1)->u;
+    uint32_t dram     = gfxd_arg_value(2)->u;
+    uint32_t tmem_end = tmem + count * 2 * 4 / 8;
+
+    for (int pal = 0; pal < 16; pal++) {
+        uint32_t pal_tmem_start = 0x100 + pal * 16;
+        uint32_t pal_tmem_end   = 0x100 + pal * 16 + 16;
+        // if [tmem;tmem_end) and [pal_tmem_start;pal_tmem_end) intersect
+        if (!(tmem_end <= pal_tmem_start || tmem >= pal_tmem_end)) {
+            state->last_load_tlut_pal16[pal].n_gfx     = state->n_gfx;
+            state->last_load_tlut_pal16[pal].addr_phys = segmented_to_physical(state, dram);
+        }
+    }
+    state->last_load_tlut_pal256.n_gfx     = state->n_gfx;
+    state->last_load_tlut_pal256.addr_phys = segmented_to_physical(state, dram);
+
+    return 0;
+}
+
+static int
 chk_DPLoadTLUT_pal16(gfx_state_t *state)
 {
     uint32_t pal                               = gfxd_arg_value(0)->u;
@@ -4341,7 +4364,7 @@ static chk_fn chk_tbl[] = {
     [gfxd_SPVertex]                = chk_SPVertex,
     [gfxd_SPViewport]              = chk_SPViewport,
     [gfxd_DPLoadTLUTCmd]           = chk_DPLoadTLUTCmd,
-    [gfxd_DPLoadTLUT]              = NULL,
+    [gfxd_DPLoadTLUT]              = chk_DPLoadTLUT,
     [gfxd_BranchZ]                 = chk_BranchZ,
     [gfxd_DisplayList]             = chk_DisplayList,
     [gfxd_DPHalf1]                 = chk_DPHalf1,
